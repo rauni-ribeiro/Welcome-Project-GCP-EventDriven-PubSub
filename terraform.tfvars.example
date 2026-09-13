@@ -1,0 +1,8 @@
+project_id             = "project-ace-cert-rauni"
+region                 = "europe-west1"
+deployment_bucket_name = "rauni-corp-deployment-files"
+gmail_secret_id        = "gmail-oath-token"
+
+# Keep these pinned to an immutable Artifact Registry digest.
+# send_email_image      = "..."
+# role_assignment_image = "..."
