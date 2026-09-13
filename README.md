@@ -129,14 +129,16 @@ Eventarc creates and manages its own transport subscription, which is not treate
 
 The intended flow is:
 
-```text
-ecommerce
-   ↓
-Eventarc-managed subscription
-   ↓
-Eventarc trigger
-   ↓
-Cloud Run — role-assignment
+```mermaid
+flowchart TD
+    A[Pub/Sub Topic<br/>ecommerce] --> B[Eventarc-Managed Subscription]
+    B --> C[Eventarc Trigger]
+    C --> D[Cloud Run<br/>role-assignment]
+
+    style A fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px,color:#111
+    style B fill:#fff3e0,stroke:#fb8c00,stroke-width:1px,color:#111
+    style C fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#111
+    style D fill:#e8f5e9,stroke:#43a047,stroke-width:1px,color:#111
 ```
 
 A second manually managed Pub/Sub subscription for this path is intentionally not created.
@@ -219,18 +221,25 @@ Current CI checks include:
 
 Current pipeline:
 
-```text
-Push / Pull Request
-        ↓
-GitHub Actions
-        ↓
-Terraform format check
-        ↓
-Terraform initialization
-        ↓
-Terraform validation
-        ↓
-✅ CI passed
+```mermaid
+flowchart TD
+    A[Push / Pull Request] --> B
+
+    subgraph CI[GitHub Actions — Terraform CI]
+        B[Checkout Repository]
+        B --> C[Terraform Format Check]
+        C --> D[Terraform Initialization]
+        D --> E[Terraform Validation]
+    end
+
+    E --> F[CI Passed ✅]
+
+    style A fill:#f5f5f5,stroke:#333,stroke-width:1px,color:#111
+    style B fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px,color:#111
+    style C fill:#fff3e0,stroke:#fb8c00,stroke-width:1px,color:#111
+    style D fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#111
+    style E fill:#e8f5e9,stroke:#43a047,stroke-width:1px,color:#111
+    style F fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#111
 ```
 
 The workflow intentionally runs:
@@ -267,27 +276,32 @@ Planned improvements include:
 
 Target future delivery flow:
 
-```text
-GitHub
-   ↓
-GitHub Actions
-   ↓
-OIDC
-   ↓
-Workload Identity Federation
-   ↓
-Google Cloud
-   ├── Terraform infrastructure workflow
-   │
-   └── Application delivery workflow
-          ↓
-       Cloud Build
-          ↓
-     Artifact Registry
-          ↓
-      Cloud Deploy
-          ↓
-       Cloud Run
+```mermaid
+flowchart TD
+    A[GitHub] --> B[GitHub Actions]
+    B --> C[OIDC]
+    C --> D[Workload Identity Federation]
+    D --> E[Google Cloud]
+
+    E --> F[Terraform Infrastructure Workflow]
+    E --> G[Application Delivery Workflow]
+
+    G --> H[Cloud Build]
+    H --> I[Artifact Registry]
+    I --> J[Cloud Deploy]
+    J --> K[Cloud Run]
+
+    style A fill:#f5f5f5,stroke:#333,stroke-width:1px,color:#111
+    style B fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px,color:#111
+    style C fill:#fff3e0,stroke:#fb8c00,stroke-width:1px,color:#111
+    style D fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#111
+    style E fill:#e8f5e9,stroke:#43a047,stroke-width:1px,color:#111
+    style F fill:#fff8e1,stroke:#f9a825,stroke-width:1px,color:#111
+    style G fill:#fce4ec,stroke:#d81b60,stroke-width:1px,color:#111
+    style H fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px,color:#111
+    style I fill:#fff3e0,stroke:#fb8c00,stroke-width:1px,color:#111
+    style J fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#111
+    style K fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#111
 ```
 
 The intended ownership boundary is:
