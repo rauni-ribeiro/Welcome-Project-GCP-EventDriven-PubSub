@@ -2,7 +2,7 @@
 
 **Rauni R Corp** is a fictional company used as the case scenario for this cloud engineering project.
 
-The goal is to automate the first steps of a new employee's onboarding journey through an **event-driven architecture on Google Cloud**, combining welcome communication, IAM access provisioning, dead-letter handling, Infrastructure as Code, and automated CI validation.
+The goal is to automate the first steps of a new employee's onboarding journey through a **fan-out, event-driven architecture on Google Cloud**, combining welcome communication, IAM access provisioning, dead-letter handling, Infrastructure as Code, and automated CI validation.
 
 <img width="1792" height="1008" alt="Rauni R Corp onboarding project" src="https://github.com/user-attachments/assets/571ed7be-704c-42ad-ba24-831aa4e6f425" />
 
@@ -17,30 +17,53 @@ A new employee joins **Rauni R Corp**.
 
 Instead of relying on multiple disconnected manual onboarding tasks, a single onboarding event is published to Google Cloud Pub/Sub.
 
-That event drives independent workflows:
+That single event is then **fanned out into independent workflows**.
 
-```text
-New Hire
-   ↓
-Pub/Sub — ecommerce
-   ├── Welcome Email Workflow
-   │      ↓
-   │   Push Subscription
-   │      ↓
-   │   Cloud Run — send-email
-   │      ↓
-   │   Gmail API + onboarding guide
-   │
-   └── IAM Provisioning Workflow
-          ↓
-       Eventarc
-          ↓
-       Cloud Run — role-assignment
-          ↓
-       Controlled IAM role assignment
+> 🔀 **Fan-out architecture:** one onboarding event is published once to Pub/Sub and distributed to multiple independent consumers. Each consumer owns a separate responsibility and can evolve, fail, or scale without tightly coupling the other workflow.
+
+In this project, the same onboarding event branches into:
+- 📨 a **Welcome Email workflow**
+- 🔐 an **IAM Provisioning workflow**
+
+This is the core architectural pattern behind the project:
+
+```mermaid
+flowchart TD
+    A[New Hire] --> B[Pub/Sub Topic<br/>ecommerce]
+
+    subgraph W[Welcome Email Workflow]
+        C[Push Subscription] --> D[Cloud Run<br/>send-email]
+        D --> E[Gmail API<br/>+ onboarding guide]
+    end
+
+    subgraph I[IAM Provisioning Workflow]
+        F[Eventarc] --> G[Cloud Run<br/>role-assignment]
+        G --> H[Controlled IAM<br/>role assignment]
+    end
+
+    B -->|Fan-out| C
+    B -->|Fan-out| F
+
+    style A fill:#f5f5f5,stroke:#333,stroke-width:1px,color:#111
+    style B fill:#e3f2fd,stroke:#1e88e5,stroke-width:1px,color:#111
+    style C fill:#fff3e0,stroke:#fb8c00,stroke-width:1px,color:#111
+    style D fill:#e8f5e9,stroke:#43a047,stroke-width:1px,color:#111
+    style E fill:#fce4ec,stroke:#d81b60,stroke-width:1px,color:#111
+    style F fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#111
+    style G fill:#e8f5e9,stroke:#43a047,stroke-width:1px,color:#111
+    style H fill:#fff8e1,stroke:#f9a825,stroke-width:1px,color:#111
 ```
 
-The architecture demonstrates how one business event can trigger multiple decoupled serverless processes while maintaining dedicated identities, restricted permissions, failure handling, and infrastructure traceability.
+
+### 🔀 Why this is a fan-out pattern
+
+The **Pub/Sub topic acts as the fan-out point**. A single `ecommerce` onboarding event is published once, but multiple downstream consumers react to that event through separate delivery paths.
+
+The Welcome Email path is delivered through its push subscription, while the IAM Provisioning path is delivered through the Eventarc-managed Pub/Sub transport subscription. The publisher does not need to know how many consumers exist or what each consumer does.
+
+This keeps the onboarding platform **decoupled and extensible**: a future workflow — such as account creation, ticket generation, asset provisioning, analytics, or HR notifications — could subscribe to the same onboarding event without modifying the original publisher.
+
+The architecture therefore demonstrates how **one business event fans out into multiple independent serverless workflows** while maintaining dedicated identities, restricted permissions, failure handling, and infrastructure traceability.
 
 ---
 
@@ -48,7 +71,7 @@ The architecture demonstrates how one business event can trigger multiple decoup
 
 The project was designed to demonstrate:
 
-- ⚡ Event-driven architecture using Pub/Sub and Eventarc
+- 🔀 Fan-out event-driven architecture using Pub/Sub and Eventarc
 - 📨 Automated employee welcome communication
 - 🔐 Automated IAM provisioning with controlled authorization boundaries
 - ☁️ Serverless workloads running on Cloud Run
@@ -372,16 +395,18 @@ GCP • Pub/Sub • Eventarc • Cloud Run • IAM • Terraform • GitHub Acti
 
 The emphasis is no longer simply on integrating cloud services.
 
-The new project focuses on designing and operating a **controlled event-driven platform**: asynchronous workflows, workload identities, IAM boundaries, dead-letter handling, brownfield IaC adoption, automated CI, and a defined path toward keyless continuous delivery.
+The new project focuses on designing and operating a **controlled fan-out event-driven platform**: one business event feeding multiple decoupled asynchronous workflows, with workload identities, IAM boundaries, dead-letter handling, brownfield IaC adoption, automated CI, and a defined path toward keyless continuous delivery.
 
 ---
+
+
 
 ## 🎯 Current project status
 
 The current portfolio implementation demonstrates:
 
 - 👋 Automated employee onboarding
-- ⚡ Event-driven cloud architecture
+- 🔀 Fan-out event-driven cloud architecture
 - 📬 Pub/Sub messaging
 - 🔀 Eventarc routing
 - ☁️ Cloud Run serverless workloads
