@@ -1,34 +1,87 @@
-# 🚀 Rauni R Corp — Terraform Reconstruction
+# 👋 Welcome Project — Event-Driven Employee Onboarding on GCP
 
-This repository is a clean Terraform reconstruction of the **Rauni R Corp event-driven onboarding project** from the current Google Cloud environment.
+**Rauni R Corp** is a fictional company used as the case scenario for this cloud engineering project.
 
-<img width="1792" height="1008" alt="image" src="https://github.com/user-attachments/assets/571ed7be-704c-42ad-ba24-831aa4e6f425" />
+The goal is to automate the first steps of a new employee's onboarding journey through an **event-driven architecture on Google Cloud**, combining welcome communication, IAM access provisioning, dead-letter handling, Infrastructure as Code, and automated CI validation.
 
-It was intentionally rebuilt from the exported resource inventory instead of copying the raw `gcloud beta resource-config bulk-export` output. The project contains unrelated ACE study resources, and the raw export also included material that should not be committed.
+<img width="1792" height="1008" alt="Rauni R Corp onboarding project" src="https://github.com/user-attachments/assets/571ed7be-704c-42ad-ba24-831aa4e6f425" />
 
-The repository now includes both the **infrastructure-as-code layer** and the **application source code** used by the onboarding workflows.
+> 🌱 **Spiritual successor to [Project Garden](https://www.rauniribeiro.com/project-garden)** — an earlier AWS portfolio project focused on decoupled cloud automation.  
+> Welcome Project evolves that idea into a more mature GCP case study centered on event-driven onboarding, IAM automation, brownfield Terraform adoption, and CI.
 
 ---
 
-## 🏗️ What is modeled
+## 🎯 Case scenario
+
+A new employee joins **Rauni R Corp**.
+
+Instead of relying on multiple disconnected manual onboarding tasks, a single onboarding event is published to Google Cloud Pub/Sub.
+
+That event drives independent workflows:
+
+```text
+New Hire
+   ↓
+Pub/Sub — ecommerce
+   ├── Welcome Email Workflow
+   │      ↓
+   │   Push Subscription
+   │      ↓
+   │   Cloud Run — send-email
+   │      ↓
+   │   Gmail API + onboarding guide
+   │
+   └── IAM Provisioning Workflow
+          ↓
+       Eventarc
+          ↓
+       Cloud Run — role-assignment
+          ↓
+       Controlled IAM role assignment
+```
+
+The architecture demonstrates how one business event can trigger multiple decoupled serverless processes while maintaining dedicated identities, restricted permissions, failure handling, and infrastructure traceability.
+
+---
+
+## ☁️ Project goals
+
+The project was designed to demonstrate:
+
+- ⚡ Event-driven architecture using Pub/Sub and Eventarc
+- 📨 Automated employee welcome communication
+- 🔐 Automated IAM provisioning with controlled authorization boundaries
+- ☁️ Serverless workloads running on Cloud Run
+- ☠️ Dead-letter handling and persistent failure storage
+- 🔑 Secure secret separation using Secret Manager
+- 👤 Dedicated service accounts and least-privilege-oriented IAM
+- 🧱 Brownfield Infrastructure as Code adoption with Terraform
+- ✅ Automated Terraform CI using GitHub Actions
+- 📚 Architecture documentation and reproducible infrastructure definitions
+
+---
+
+## 🏗️ What is modeled in Terraform
+
+Terraform reconstructs and manages the infrastructure supporting the onboarding platform:
 
 - 📬 Pub/Sub topic `ecommerce`
 - 🧬 AVRO schema `ecommerce_order_schema`
 - 📩 Welcome-email push subscription
 - ☠️ Welcome-email DLQ topic
-- 🗄️ DLQ -> Cloud Storage subscription (AVRO)
+- 🗄️ DLQ -> Cloud Storage subscription using AVRO
 - ☁️ Cloud Run `send-email`
 - ☁️ Cloud Run `rauni-corp-role-assignment-service`
 - ⚡ Eventarc role-assignment trigger
-- 🔄 Eventarc transport via the existing `ecommerce` topic
+- 🔄 Eventarc transport through the existing `ecommerce` topic
 - 👤 Dedicated runtime service accounts
 - 🔐 Custom project IAM role
 - 🛡️ Conditional IAM binding using `modifiedGrantsByRole`
 - 🔑 Secret Manager secret metadata only
 - 🪣 Deployment / DLQ Cloud Storage bucket
-- 🤖 Pub/Sub service-agent permissions needed by the DLQ path
-- 🐍 Application source code for both onboarding services
-- ✅ GitHub Actions CI for Terraform validation
+- 🤖 Pub/Sub service-agent permissions required by the DLQ path
+
+The repository also contains the Python source code for both onboarding workloads under `services/`.
 
 ---
 
@@ -37,35 +90,45 @@ The repository now includes both the **infrastructure-as-code layer** and the **
 - Secret Manager **secret versions / secret payloads**
 - OAuth refresh tokens
 - Raw `token.json`
-- Unrelated ACE labs (MIG, Cloud SQL, BigQuery labs, thumbnail app, older Eventarc lab, etc.)
-- Cloud Run build/source-upload buckets and generated build metadata
-- The Eventarc-generated Pub/Sub subscription as an independent resource
+- Unrelated Google Cloud ACE labs
+- Cloud Run source-upload/build buckets and generated build metadata
+- The Eventarc-generated Pub/Sub subscription as an independent Terraform resource
+
+This separation keeps sensitive or provider-managed data outside version-controlled infrastructure definitions.
 
 ---
 
-## ⚡ Why the Eventarc subscription is not a Terraform resource
+## ⚡ Eventarc transport behavior
 
-For Pub/Sub-backed Eventarc triggers, Terraform declares the **transport topic**. Eventarc creates and manages its own transport subscription, and that subscription is an output-only property of the trigger.
+For Pub/Sub-backed Eventarc triggers, Terraform declares the **transport topic**.
 
-So this is correct:
+Eventarc creates and manages its own transport subscription, which is not treated as a separately managed resource in this project.
+
+The intended flow is:
 
 ```text
-ecommerce -> Eventarc-managed subscription -> Eventarc trigger -> Cloud Run
+ecommerce
+   ↓
+Eventarc-managed subscription
+   ↓
+Eventarc trigger
+   ↓
+Cloud Run — role-assignment
 ```
 
-There should not be a second manually-managed Terraform subscription for the same Eventarc path.
+A second manually managed Pub/Sub subscription for this path is intentionally not created.
 
 ---
 
 ## 🔐 Secret handling
 
-`secrets.tf` creates/manages only the `gmail-oath-token` secret container.
+`secrets.tf` manages only the `gmail-oath-token` Secret Manager container.
 
-The secret payload is deliberately injected outside Terraform. This avoids writing the OAuth token into:
+The actual OAuth payload is injected outside Terraform to prevent sensitive values from being written into:
 
 - Git
 - `.tf` files
-- plan files
+- Terraform plan files
 - Terraform state
 
 Example manual secret-version update:
@@ -78,11 +141,13 @@ gcloud secrets versions add gmail-oath-token \
 
 ---
 
-## 🌱 Brownfield adoption: import first
+## 🌱 Brownfield Terraform adoption
 
-These resources already exist.
+The GCP environment existed before the Terraform configuration.
 
-**Do not run `terraform apply` before importing them.**
+Rather than deleting and recreating a working platform, the existing infrastructure was adopted into Terraform state.
+
+**Do not run `terraform apply` before importing the existing resources.**
 
 ```bash
 terraform init
@@ -91,32 +156,34 @@ chmod +x import-core.sh
 terraform plan
 ```
 
-The script imports the core infrastructure.
+The import process turns the manually created cloud environment into a Terraform-managed baseline while preserving the running architecture.
 
-IAM member resources are not automatically imported because IAM import identifiers are more fragile, especially conditional bindings and `for_each` members. After the core import, inspect `terraform plan` and import the remaining IAM resources deliberately before applying.
+IAM member resources are imported deliberately after inspecting the reconciliation plan because conditional bindings and IAM import identifiers require additional care.
 
-The goal of the first plan is **reconciliation**, not blind recreation of an already-running environment.
+The first Terraform plan should therefore be treated as a **reconciliation exercise**, not permission to blindly apply changes.
 
 ---
 
-## 🧠 Important current-state notes
+## 🧠 Current security and reliability controls
 
-- The welcome-email runtime identity currently has project-level `roles/run.invoker`, `roles/pubsub.subscriber`, `roles/secretmanager.secretAccessor`, and `roles/storage.objectViewer`.
-- The role-assignment service account uses the custom role `projects/project-ace-cert-rauni/roles/CustomRole`.
-- That custom role contains only:
+- The welcome-email runtime identity has only the permissions required by its current workflow.
+- The role-assignment service uses a dedicated service account.
+- A custom project role contains only:
   - `resourcemanager.projects.getIamPolicy`
   - `resourcemanager.projects.setIamPolicy`
-- Its conditional binding allows modifications only to:
+- An IAM Condition restricts allowed role modifications to:
   - `roles/viewer`
   - `roles/logging.viewer`
-- The welcome-email source subscription uses `max_delivery_attempts = 5`.
+- Welcome-email delivery uses `max_delivery_attempts = 5`.
+- Failed welcome events can reach a dedicated DLQ.
 - DLQ messages are persisted as AVRO under `dlq/welcome-email/`.
+- Secret payloads are deliberately kept outside Terraform state and Git.
 
 ---
 
 ## ✅ Continuous Integration
 
-The repository includes a GitHub Actions workflow that automatically validates the Terraform configuration on pushes and pull requests targeting `main`.
+The repository includes a **GitHub Actions CI pipeline** that validates the Terraform configuration whenever changes are pushed or proposed against `main`.
 
 Current CI checks include:
 
@@ -127,15 +194,7 @@ Current CI checks include:
 - ⚙️ `terraform init -backend=false -input=false`
 - ✅ `terraform validate -no-color`
 
-The CI workflow intentionally uses:
-
-```bash
-terraform init -backend=false
-```
-
-This keeps validation independent from the current local Terraform state and prevents the CI runner from attempting to access or modify production infrastructure.
-
-At this stage, the workflow is **CI-only** by design:
+Current pipeline:
 
 ```text
 Push / Pull Request
@@ -151,31 +210,39 @@ Terraform validation
 ✅ CI passed
 ```
 
-No cloud credentials or static service-account keys are required for the current CI pipeline.
+The workflow intentionally runs:
+
+```bash
+terraform init -backend=false
+```
+
+This allows CI to validate the code without requiring access to the current local Terraform state or production infrastructure.
+
+No static Google Cloud credentials or service-account JSON keys are required by the current CI workflow.
 
 ---
 
 ## 🔄 Expected future updates
 
-The next evolution of the project is to extend the current CI workflow into a full **keyless CI/CD pipeline**.
+The next engineering phase is to evolve the current CI workflow into a complete **keyless CI/CD delivery pipeline**.
 
 Planned improvements include:
 
-- 🔑 GitHub OIDC authentication with **Google Cloud Workload Identity Federation**
-- 🚫 No long-lived service-account JSON keys stored in GitHub
+- 🔑 GitHub OIDC authentication through **Google Cloud Workload Identity Federation**
+- 🚫 No long-lived Google Cloud service-account JSON keys in GitHub
 - 🏗️ Automated application builds using **Cloud Build**
-- 📦 Immutable container images stored in **Artifact Registry**
-- 🚀 Automated deployment of both Cloud Run services
-- 🌊 Progressive delivery / canary releases using **Cloud Deploy**
-- 📊 Deployment health verification using Cloud Logging and Cloud Monitoring
-- 🪣 Dedicated GCS bucket for Terraform remote state
+- 📦 Immutable application images stored in **Artifact Registry**
+- 🚀 Automated Cloud Run deployments
+- 🌊 Progressive / canary delivery using **Cloud Deploy**
+- 📊 Rollout health verification using Cloud Logging and Cloud Monitoring
+- 🪣 Dedicated GCS backend for Terraform remote state
 - 🔍 Automated Terraform drift detection
 - 🧪 Application-level tests in CI
-- 🛡️ Additional IaC/security validation
-- 🔁 Explicit retry with exponential backoff for concurrent IAM policy updates
-- 📈 Log-based metrics and alerting for Cloud Run 5xx responses and DLQ activity
+- 🛡️ Additional IaC and security checks
+- 🔁 Retry and exponential backoff for concurrent IAM policy updates
+- 📈 Log-based metrics and alerts for Cloud Run 5xx responses and DLQ activity
 
-Target delivery architecture:
+Target future delivery flow:
 
 ```text
 GitHub
@@ -188,6 +255,7 @@ Workload Identity Federation
    ↓
 Google Cloud
    ├── Terraform infrastructure workflow
+   │
    └── Application delivery workflow
           ↓
        Cloud Build
@@ -199,20 +267,28 @@ Google Cloud
        Cloud Run
 ```
 
-Terraform and the application deployment pipeline should have clearly separated ownership boundaries. Terraform manages the **platform, IAM, Pub/Sub, Eventarc, storage and service configuration**, while the deployment pipeline manages **application artifacts, revisions and rollout traffic**.
+The intended ownership boundary is:
+
+**Terraform**
+→ infrastructure, IAM, Pub/Sub, Eventarc, storage, service configuration
+
+**Application delivery pipeline**
+→ application artifacts, revisions, releases, and rollout traffic
+
+This avoids Terraform and the deployment system competing for ownership of the same Cloud Run deployment lifecycle.
 
 ---
 
 ## 🛡️ Additional hardening opportunities
 
-These are deliberately left as future improvements rather than silently changing the current environment:
+Future improvements may also include:
 
-- Move broad project-level permissions to resource-level permissions where possible.
-- Add explicit handling for concurrent IAM policy updates (`etag` + retry / exponential backoff) in the role-assignment application.
-- Add log-based metrics and alerting for Cloud Run 5xx and DLQ activity.
-- Use a dedicated GCS bucket for Terraform remote state rather than the deployment-files bucket.
-- Introduce controlled Terraform `plan` / `apply` workflows after remote state and Workload Identity Federation are configured.
-- Protect `main` with pull-request checks before infrastructure or application deployment.
+- Moving broad project-level permissions to resource-level bindings where possible
+- Explicit `etag` handling and exponential retry for concurrent IAM policy updates
+- Cloud Run 5xx log-based metrics and alerting
+- DLQ activity alerts
+- Protected `main` branch with required CI checks
+- Controlled Terraform `plan` / `apply` workflows after remote state and Workload Identity Federation are introduced
 
 ---
 
@@ -245,23 +321,24 @@ These are deliberately left as future improvements rather than silently changing
 
 ### Key files
 
-- `provider.tf` / `versions.tf` — Terraform/provider configuration
-- `service-accounts.tf` — dedicated runtime identities
-- `pubsub.tf` — topic, schema, push subscription, DLQ and storage subscription
-- `cloudrun.tf` — both Cloud Run services
-- `eventarc.tf` — Eventarc trigger and transport
-- `iam.tf` — custom role, IAM Condition and current project-level runtime permissions
-- `storage.tf` — artifact/DLQ bucket and Pub/Sub bucket permissions
+- `services/send-email/` — welcome email application
+- `services/role-assignment/` — employee IAM provisioning application
+- `pubsub.tf` — onboarding topic, schema, push subscription, DLQ and storage subscription
+- `cloudrun.tf` — both serverless onboarding workloads
+- `eventarc.tf` — Eventarc role-assignment trigger
+- `iam.tf` — custom role, IAM Condition and runtime permissions
+- `service-accounts.tf` — dedicated workload identities
+- `storage.tf` — onboarding guide / DLQ storage
 - `secrets.tf` — secret metadata only
-- `outputs.tf` — useful resource identifiers
-- `services/` — source code for the two Cloud Run onboarding workloads
-- `.github/workflows/ci.yml` — automated Terraform CI validation
-- `ARCHITECTURE.md` — Mermaid architecture diagram
-- `import-core.sh` — brownfield import helper
+- `provider.tf` / `versions.tf` — Terraform and provider configuration
+- `outputs.tf` — useful infrastructure identifiers
+- `.github/workflows/ci.yml` — Terraform CI validation
+- `ARCHITECTURE.md` — architecture documentation
+- `import-core.sh` — brownfield infrastructure import helper
 
 ---
 
-## 🧰 Recommended local workflow
+## 🧰 Recommended Terraform workflow
 
 ```bash
 terraform fmt -recursive
@@ -271,22 +348,50 @@ terraform validate
 terraform plan
 ```
 
-Treat the first plan as a **reconciliation exercise**, not as permission to apply blindly. The source environment was originally built manually and through managed Google Cloud integrations, so some system-generated metadata will not belong in clean IaC.
+The source environment was originally built manually and through managed Google Cloud integrations, so some system-generated metadata does not belong in clean IaC.
+
+Always review Terraform plans before applying infrastructure changes.
+
+---
+
+## 🌿 From Project Garden to Welcome Project
+
+**Project Garden** explored a hypothetical AWS business scenario using S3, Lambda, DynamoDB, and Rekognition, with an early focus on decoupling cloud functions and solving a concrete business problem.
+
+**Welcome Project** keeps that same portfolio philosophy but moves the architecture forward:
+
+```text
+Project Garden
+AWS • Lambda • S3 • DynamoDB • Rekognition
+        ↓
+        ↓  evolution
+        ↓
+Welcome Project
+GCP • Pub/Sub • Eventarc • Cloud Run • IAM • Terraform • GitHub Actions
+```
+
+The emphasis is no longer simply on integrating cloud services.
+
+The new project focuses on designing and operating a **controlled event-driven platform**: asynchronous workflows, workload identities, IAM boundaries, dead-letter handling, brownfield IaC adoption, automated CI, and a defined path toward keyless continuous delivery.
 
 ---
 
 ## 🎯 Current project status
 
-The current implementation demonstrates:
+The current portfolio implementation demonstrates:
 
-- ☁️ Google Cloud serverless architecture
-- ⚡ Event-driven design with Pub/Sub and Eventarc
-- 🔐 IAM automation with custom roles and conditional access
-- 🧱 Brownfield Terraform adoption
-- 📨 Automated onboarding workflows
+- 👋 Automated employee onboarding
+- ⚡ Event-driven cloud architecture
+- 📬 Pub/Sub messaging
+- 🔀 Eventarc routing
+- ☁️ Cloud Run serverless workloads
+- 🔐 IAM provisioning and authorization controls
 - ☠️ Dead-letter handling and persistence
 - 🔑 Secure secret separation
+- 🧱 Brownfield Terraform adoption
 - 🐍 Version-controlled application workloads
-- ✅ Automated Terraform CI with GitHub Actions
+- ✅ GitHub Actions CI
 
-The project is considered **feature-complete for the current portfolio scope**, with full CD, progressive delivery, remote state and observability automation documented as the next engineering phase.
+The project is **feature-complete for its current portfolio scope**.
+
+Full CD, progressive delivery, remote Terraform state, automated drift detection, and expanded observability are documented as the next engineering phase.
